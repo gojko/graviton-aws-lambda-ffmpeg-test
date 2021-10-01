@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Test for graviton/x86 lambda using ffmpeg
+Parameters:
+  MemorySize:
+    Type: Number
+    Default: 512
+Resources:
+  TaskTopic:
+    Type: AWS::SNS::Topic
+
+  TaskTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: s3.amazonaws.com
+          Action: sns:Publish
+          Resource: '*'
+      Topics:
+        - !Ref TaskTopic
+
+  TasksBucket:
+    DependsOn: TaskTopicPolicy
+    Type: AWS::S3::Bucket
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          - ExpirationInDays: 1
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 1
+      NotificationConfiguration:
+        TopicConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Topic: !Ref TaskTopic
+
+  ArmFFmpegLayer:
+    Type: 'AWS::Lambda::LayerVersion'
+    Properties:
+      LayerName: !Sub "FFmpegArm64-${AWS::StackName}"
+      Content: out/ffmpeg-layer-arm64
+
+
+  IntelFFmpegLayer:
+    Type: 'AWS::Lambda::LayerVersion'
+    Properties:
+      LayerName: !Sub "FFmpegX86_64-${AWS::StackName}"
+      Content: out/ffmpeg-layer-amd64
+
+  TaskLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 'sts:AssumeRole'
+            Principal:
+              Service: lambda.amazonaws.com
+      Policies:
+        - PolicyName: WriteCloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+        - PolicyName: TasksBucketReader
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                Resource:  !Sub "${TasksBucket.Arn}/*"
+
+  ArmConvertFileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs14.x
+      Code: out/lambda/
+      Architectures: ["arm64"]
+      Handler: lambda.handler
+      Timeout: 900
+      MemorySize: !Ref MemorySize
+      Role: !GetAtt TaskLambdaRole.Arn
+      Environment:
+        Variables:
+          LAMBDA_ARCH: 'arm64'
+      Layers:
+        - !Ref ArmFFmpegLayer
+
+  ArmTaskInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref ArmConvertFileFunction
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Ref TaskTopic
+
+  ArmTaskSNSSubscription:
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      TopicArn: !Ref TaskTopic
+      Endpoint: !GetAtt ArmConvertFileFunction.Arn
+      Protocol: lambda
+
+  IntelConvertFileFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: nodejs14.x
+      Code: out/lambda/
+      Architectures: ["x86_64"]
+      Handler: lambda.handler
+      Timeout: 900
+      MemorySize: !Ref MemorySize
+      Role: !GetAtt TaskLambdaRole.Arn
+      Environment:
+        Variables:
+          LAMBDA_ARCH: 'x86_64'
+      Layers:
+        - !Ref IntelFFmpegLayer
+
+  IntelTaskInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref IntelConvertFileFunction
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Ref TaskTopic
+
+  IntelTaskSNSSubscription:
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      TopicArn: !Ref TaskTopic
+      Endpoint: !GetAtt IntelConvertFileFunction.Arn
+      Protocol: lambda
+
+
+
+Outputs:
+    TasksBucket:
+      Description: "Upload S3 bucket"
+      Value: !Ref TasksBucket

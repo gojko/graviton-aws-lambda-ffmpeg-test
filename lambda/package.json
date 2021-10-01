@@ -1,0 +1,20 @@
+{
+  "name": "src",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lambda.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.34.0",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.13.3",
+    "eslint": "^7.32.0"
+  }
+}
