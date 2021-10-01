@@ -71,3 +71,7 @@ Each function logs to its own cloudwatch logs, with a JSON format outputing the 
 }
 ```
 
+## Published test results
+
+* 1 October 2021, us-east-1 region: <https://www.narakeet.com/tech/graviton-lambda-ffmpeg.html> (Intel wins by more than 20% in average)
+
