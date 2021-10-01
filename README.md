@@ -49,7 +49,7 @@ Each function logs to its own cloudwatch logs, with a JSON format outputing the 
 
 - Graviton 2/ arm function
 
-```json
+```js
 {
   key: 'pexels-i-am-sorin-6172942.mp4',
   memorySize: '10240',
@@ -61,7 +61,7 @@ Each function logs to its own cloudwatch logs, with a JSON format outputing the 
 
 - Intel/X86 function
 
-```json
+```js
 {
   key: 'pexels-i-am-sorin-6172942.mp4',
   memorySize: '10240',
@@ -70,7 +70,4 @@ Each function logs to its own cloudwatch logs, with a JSON format outputing the 
   fileSize: 184974533
 }
 ```
-
-## Remove resources
-
 
